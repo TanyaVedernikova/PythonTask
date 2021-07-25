@@ -1,5 +1,5 @@
 from user import User
-import multiprocessing
+import threading
 
 
 class IteratorForReallyBigResponse:
@@ -8,12 +8,14 @@ class IteratorForReallyBigResponse:
         self.token = User.make_auth()
         self.start_offset = start_offset
         self.finish_offset = finish_offset
+        self.count = 0
 
     def __iter__(self):
         return self
 
     def __next__(self):
         resp = User.make_req(self.token, self.start_offset)
+        self.count = resp.get("count")
         if resp.get("results") and self.start_offset != self.finish_offset:
             self.start_offset += 100
             return resp
@@ -26,11 +28,21 @@ def loader(iterator: IteratorForReallyBigResponse):
         f.write(str(resp))
 
 
+def count_of_all_answer():
+    resp = IteratorForReallyBigResponse(0, 1)
+    resp.__next__()
+    count = resp.count
+    return count
+
+
 if __name__ == '__main__':
-    Process_jobs = []
-    for z in [0, 5000, 10000]:
-        p = multiprocessing.Process(target=loader, args=(IteratorForReallyBigResponse(z, z+5000),))
-        Process_jobs.append(p)
+    count_of_threads = 100
+    count_of_answer = count_of_all_answer()
+    value_of_step = count_of_answer // count_of_threads + 1
+    thread_jobs = []
+    for z in [i * value_of_step for i in range(count_of_threads)]:
+        p = threading.Thread(target=loader, args=(IteratorForReallyBigResponse(z, z + value_of_step),))
+        thread_jobs.append(p)
         p.start()
-    for p in Process_jobs:
+    for p in thread_jobs:
         p.join()
